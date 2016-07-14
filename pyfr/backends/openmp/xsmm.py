@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from ctypes import (CDLL, CFUNCTYPE, RTLD_GLOBAL, POINTER,
+from ctypes import (CDLL, CFUNCTYPE, RTLD_GLOBAL, POINTER, cast,
                     c_int, c_void_p, c_float, c_double)
 
 import numpy as np
@@ -84,8 +84,19 @@ class OpenMPXSMMKernels(OpenMPKernelProvider):
             alpha_ct, beta_ct = c_float(alpha), c_float(beta)
             gemm = w.smmdispatch(nblock, m, k, ldb, lda, ldc, alpha_ct, beta_ct)
 
+        argt = [np.intp, np.int32, np.intp, np.intp, np.intp]
+
+        # Render the kernel template
+        tplargs = dict(nblock=nblock)
+        src = self.backend.lookup.get_template('par_xsmm_gemm').render(**tplargs)
+
+        # Build
+        par_gemm = self._build_kernel('par_xsmm_gemm', src, argt)
+
+        gemm_ptr = cast(gemm, c_void_p).value
+
         class MulKernel(ComputeKernel):
             def run(self, queue):
-                gemm(b, a, out)
+                par_gemm(gemm_ptr, n, b, a, out)
 
         return MulKernel()
