@@ -68,6 +68,10 @@ class OpenMPXSMMKernels(OpenMPKernelProvider):
         # Ensure the matrices are compatible
         if a.nrow != out.nrow or a.ncol != b.nrow or b.ncol != out.ncol:
             raise ValueError('Incompatible matrices for out = a*b')
+        
+        # Check size (ldb < 65536)
+        if b.leaddim > 65536:
+            raise NotSuitableError('Leaddim is too big')
 
         # TODO: Block is the same as align bytes (which value is optimal?)
         nblock = self.backend.alignb // a.itemsize
