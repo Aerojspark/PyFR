@@ -5,7 +5,7 @@
 
 <% tau = c['ldg-tau'] %>
 
-<%pyfr:macro name='bc_common_flux_state' params='ul, gradul, amul, nl, magnl, ploc, t'>
+<%pyfr:macro name='bc_common_flux_state' params='ul, gradul, fl, amul, nl, magnl, ploc, t'>
     // Viscous states
     fpdtype_t ur[${nvars}], gradur[${ndims}][${nvars}];
     ${pyfr.expand('bc_ldg_state', 'ul', 'nl', 'ur', 'ploc', 't')};
@@ -21,6 +21,7 @@
     fpdtype_t ficomm[${nvars}], fvcomm;
     ${pyfr.expand('rsolve', 'ul', 'ur', 'nl', 'ficomm')};
 
+    fpdtype_t fln;
 % for i in range(nvars):
     fvcomm = ${' + '.join('nl[{j}]*fvr[{j}][{i}]'.format(i=i, j=j)
                           for j in range(ndims))};
@@ -28,6 +29,9 @@
     fvcomm += ${tau}*(ul[${i}] - ur[${i}]);
 % endif
 
-    ul[${i}] = magnl*(ficomm[${i}] + fvcomm);
+    fln = ${'+'.join('nl[{0}]*fl[{0}][{1}]'.format(j, i)
+                      for j in range(ndims))};
+
+    ul[${i}] = magnl*(ficomm[${i}] + fvcomm - fln);
 % endfor
 </%pyfr:macro>

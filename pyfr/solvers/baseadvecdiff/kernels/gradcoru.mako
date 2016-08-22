@@ -3,7 +3,7 @@
 <%namespace module='pyfr.backends.base.makoutil' name='pyfr'/>
 
 <%pyfr:kernel name='gradcoru' ndim='2'
-              smats='in fpdtype_t[${str(ndims)}][${str(ndims)}]'
+              tsmats='in fpdtype_t[${str(ndims)}][${str(ndims)}]'
               rcpdjac='in fpdtype_t'
               gradu='inout fpdtype_t[${str(ndims)}][${str(nvars)}]'>
     fpdtype_t tmpgradu[${ndims}];
@@ -13,7 +13,7 @@
     tmpgradu[${i}] = gradu[${i}][${j}];
 % endfor
 % for i in range(ndims):
-    gradu[${i}][${j}] = rcpdjac*(${' + '.join('smats[{k}][{i}]*tmpgradu[{k}]'
+    gradu[${i}][${j}] = rcpdjac*(${' + '.join('tsmats[{i}][{k}]*tmpgradu[{k}]'
                                               .format(i=i, k=k)
                                               for k in range(ndims))});
 % endfor

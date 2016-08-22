@@ -48,7 +48,6 @@ class BaseElements(object, metaclass=ABCMeta):
         self.nqpts = basis.nqpts if haveqpts else None
         self.nfpts = basis.nfpts
         self.nfacefpts = basis.nfacefpts
-        self.nmpts = basis.nmpts
 
     @abstractmethod
     def pri_to_con(ics, cfg):
@@ -172,6 +171,17 @@ class BaseElements(object, metaclass=ABCMeta):
             self._vect_qpts = valloc('vect_qpts', nqpts)
         if 'vect_fpts' in sbufs:
             self._vect_fpts = valloc('vect_fpts', nfpts)
+        if 'matr_upts' in sbufs:
+            dim_vfpts = (ndims, nfpts, nvars, neles)
+            dim_mupts = (ndims**2, nupts, nvars, neles)
+            if nfpts > ndims*nupts:
+                self._vect0_fpts = aliases = alloc('matr_upts', dim_vfpts)
+                self._matr_upts = backend.matrix(dim_mupts, aliases=aliases,
+                                                 tags={'align'})
+            else:
+                self._matr_upts = aliases = alloc('matr_upts', dim_mupts)
+                self._vect0_fpts = backend.matrix(dim_vfpts, aliases=aliases,
+                                                  tags={'align'})
 
         # Allocate and bank the storage required by the time integrator
         self._scal_upts = [backend.matrix(self._scal_upts.shape,
@@ -192,12 +202,12 @@ class BaseElements(object, metaclass=ABCMeta):
                                      tags={expr, 'align'})
 
     @memoize
-    def smat_at_np(self, name):
-        return self._get_smats(getattr(self.basis, name))
+    def smat_tr_at_np(self, name):
+        return self._get_smats(getattr(self.basis, name)).swapaxes(0, 2)
 
     @memoize
-    def smat_at(self, name):
-        return self._be.const_matrix(self.smat_at_np(name), tags={'align'})
+    def smat_tr_at(self, name):
+        return self._be.const_matrix(self.smat_tr_at_np(name), tags={'align'})
 
     @memoize
     def rcpdjac_at_np(self, name):
@@ -255,78 +265,47 @@ class BaseElements(object, metaclass=ABCMeta):
         self._gen_pnorm_fpts()
         return self._mag_pnorm_fpts
 
+    def _get_jac(self, pts):
+        # Reshape (ndim, nspts, nepts)->(ndim, nepts, nspts)
+        jacop = self.basis.sbasis.jac_nodal_basis_at(pts).swapaxes(1, 2)
+        jacop = jacop.reshape(-1, self.nspts)
+
+        # Reshape (nspts, neles, ndims)->(nspts, ndims*neles)
+        x = self.eles.swapaxes(1, 2).reshape(self.nspts, -1)
+
+        # Dotting
+        jac = np.dot(jacop, x).reshape(self.ndims, -1, self.ndims, self.neles)
+
+        # Reshape (ndim, nepts, ndim, neles)->(ndim (x), epts, ndim (p), neles)
+        return jac.transpose(2, 1, 0, 3)
+
     def _get_smats(self, pts, retdets=False):
-        npts = len(pts)
-        smats_mpts, djacs_mpts = self._smats_djacs_mpts
-
-        # Interpolation matrix to pts
-        M0 = self.basis.mbasis.nodal_basis_at(pts)
-
-        # Interpolate smats
-        smats = np.array([np.dot(M0, smat) for smat in smats_mpts])
-        smats = smats.reshape(self.ndims, npts, self.ndims, -1)
-
-        # Interpolate djacs
-        if retdets:
-            return smats, np.dot(M0, djacs_mpts)
-        else:
-            return smats
-
-    @lazyprop
-    def _smats_djacs_mpts(self):
-        # Metric basis with grid point (q<=p) or pseudo grid points (q>p)
-        mpts = self.basis.mpts
-        mbasis = self.basis.mbasis
-
-        # Dimensions, number of elements and number of mpts
-        ndims, neles, nmpts = self.ndims, self.neles, self.nmpts
-
-        # Coordinate at pts
-        x = self.ploc_at_np('mpts')
-
-        # Jacobian at pts
-        jacop = np.rollaxis(mbasis.jac_nodal_basis_at(mpts), 2)
-        jacop = jacop.reshape(-1, nmpts)
-
-        # Cast as a matrix multiply and apply to eles
-        jac = np.dot(jacop, x.reshape(nmpts, -1))
-
-        # Reshape (npts*ndims, neles*ndims) => (npts, ndims, neles, ndims)
-        jac = jac.reshape(nmpts, ndims, ndims, neles)
-
-        # Transpose to get (ndims, npts, ndims, neles)
-        jac = jac.transpose(2, 0, 1, 3)
-
+        jac = self._get_jac(pts)
         smats = np.empty_like(jac)
 
-        if ndims == 2:
-            # Just compute smats whose order is q-1
-            a, b, c, d = jac[0,:,0], jac[0,:,1], jac[1,:,0], jac[1,:,1]
+        if self.ndims == 2:
+            a, b, c, d = jac[0, :, 0], jac[0, :, 1], jac[1, :, 0], jac[1, :, 1]
 
-            smats[0,:,0], smats[0,:,1] = d, -b
-            smats[1,:,0], smats[1,:,1] = -c, a
+            smats[0, :, 0], smats[0, :, 1] = d, -b
+            smats[1, :, 0], smats[1, :, 1] = -c, a
 
-            djacs = a*d - b*c
+            if retdets:
+                det = a * d - b * c
+
         else:
-            # Compute x cross x_(chi)
-            jac = np.rollaxis(jac, 2)
-            tt = [np.cross(x, dx, axisa=1, axisb=0, axisc=1) for dx in jac]
-            tt = np.array(tt).reshape(ndims, nmpts, -1)
+            # Covariant vector
+            cv0, cv1, cv2 = jac[:, :, 0], jac[:, :, 1], jac[:, :, 2]
 
-            # Derivative of x cross x_(chi) at (pseudo) grid points
-            dtt = np.array([np.dot(jacop, tn) for tn in tt])
-            dtt = dtt.reshape(ndims, nmpts, ndims, ndims, -1).swapaxes(1, 2)
+            # Contra-variant vector ct[i] = cv[j] x cv[k], smats = [cv]^T
+            smats[0] = np.cross(cv1, cv2, axisa=0, axisb=0, axisc=1)
+            smats[1] = np.cross(cv2, cv0, axisa=0, axisb=0, axisc=1)
+            smats[2] = np.cross(cv0, cv1, axisa=0, axisb=0, axisc=1)
 
-            # Kopriva's invariant form of smats
-            # Ref. JSC 26(3), 301-327, Eq. (37)
-            smats[0] = 0.5*(dtt[2][1] - dtt[1][2])
-            smats[1] = 0.5*(dtt[0][2] - dtt[2][0])
-            smats[2] = 0.5*(dtt[1][0] - dtt[0][1])
+            if retdets:
+                # |J| = cv[0] dot (cv[1] x cv[2]) = cv[0] dot ct[0]
+                det = np.einsum('ijk,jik->jk', cv0, smats[0])
 
-            # Exploit the fact that det(J) = x0 . (x1 ^ x2)
-            djacs = np.einsum('ij...,ji...->j...', jac[0], smats[0])
-
-        return smats.reshape(ndims, self.nmpts, -1), djacs
+        return (smats, det) if retdets else smats
 
     def get_mag_pnorms(self, eidx, fidx):
         fpts_idx = self.basis.facefpts[fidx]
@@ -359,6 +338,14 @@ class BaseElements(object, metaclass=ABCMeta):
         rcstri = ((self.nfpts, self._vect_fpts.leadsubdim),)*nfp
 
         return (self._vect_fpts.mid,)*nfp, rcmap, rcstri
+
+    def get_vect0_fpts_for_inter(self, eidx, fidx):
+        nfp = self.nfacefpts[fidx]
+
+        rcmap = [(fpidx, eidx) for fpidx in self._srtd_face_fpts[fidx][eidx]]
+        rcstri = ((self.nfpts, self._vect0_fpts.leadsubdim),) * nfp
+
+        return (self._vect0_fpts.mid,) * nfp, rcmap, rcstri
 
     def get_avis_fpts_for_inter(self, eidx, fidx):
         nfp = self.nfacefpts[fidx]

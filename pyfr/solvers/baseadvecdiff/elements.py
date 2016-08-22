@@ -7,7 +7,7 @@ from pyfr.backends.base.kernels import ComputeMetaKernel
 class BaseAdvectionDiffusionElements(BaseAdvectionElements):
     @property
     def _scratch_bufs(self):
-        bufs = {'scal_fpts', 'vect_fpts', 'vect_upts'}
+        bufs = {'scal_fpts', 'vect_fpts', 'vect_upts', 'matr_upts'}
 
         if 'flux' in self.antialias:
             bufs |= {'scal_qpts', 'vect_qpts'}
@@ -40,7 +40,7 @@ class BaseAdvectionDiffusionElements(BaseAdvectionElements):
         )
         self.kernels['gradcoru_upts'] = lambda: backend.kernel(
             'gradcoru', tplargs=dict(ndims=self.ndims, nvars=self.nvars),
-             dims=[self.nupts, self.neles], smats=self.smat_at('upts'),
+             dims=[self.nupts, self.neles], tsmats=self.smat_tr_at('upts'),
              rcpdjac=self.rcpdjac_at('upts'), gradu=self._vect_upts
         )
 

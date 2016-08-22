@@ -11,7 +11,7 @@ from pyfr.util import ndrange
 class NavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
     def set_backend(self, backend, nscalupts):
         super().set_backend(backend, nscalupts)
-        backend.pointwise.register('pyfr.solvers.navstokes.kernels.tflux')
+        backend.pointwise.register('pyfr.solvers.navstokes.kernels.dflux')
 
         visc_corr = self.cfg.get('solver', 'viscosity-correction', 'none')
         if visc_corr not in {'sutherland', 'none'}:
@@ -111,14 +111,12 @@ class NavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
             raise ValueError('Invalid shock-capturing option')
 
         if 'flux' in self.antialias:
-            self.kernels['tdisf'] = lambda: backend.kernel(
-                'tflux', tplargs=tplargs, dims=[self.nqpts, self.neles],
-                u=self._scal_qpts, smats=self.smat_at('qpts'),
-                f=self._vect_qpts, amu=avis_qpts
+            self.kernels['disf_upts'] = lambda: backend.kernel(
+                'dflux', tplargs=tplargs, dims=[self.nqpts, self.neles],
+                u=self._scal_qpts, f=self._vect_qpts, amu=avis_qpts
             )
         else:
-            self.kernels['tdisf'] = lambda: backend.kernel(
-                'tflux', tplargs=tplargs, dims=[self.nupts, self.neles],
-                u=self.scal_upts_inb, smats=self.smat_at('upts'),
-                f=self._vect_upts, amu=avis_upts
+            self.kernels['disf_upts'] = lambda: backend.kernel(
+                'dflux', tplargs=tplargs, dims=[self.nupts, self.neles],
+                u=self.scal_upts_inb, f=self._vect_upts, amu=avis_upts
             )

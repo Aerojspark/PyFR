@@ -15,9 +15,10 @@ class EulerIntInters(BaseAdvectionIntInters):
         tplargs = dict(ndims=self.ndims, nvars=self.nvars, rsolver=rsolver,
                        c=self._tpl_c)
 
-        self.kernels['comm_flux'] = lambda: self._be.kernel(
+        self.kernels['comfmdisfn'] = lambda: self._be.kernel(
             'intcflux', tplargs=tplargs, dims=[self.ninterfpts],
             ul=self._scal0_lhs, ur=self._scal0_rhs,
+            fl=self._vect0_lhs, fr=self._vect0_rhs,
             magnl=self._mag_pnorm_lhs, nl=self._norm_pnorm_lhs
         )
 
@@ -32,9 +33,9 @@ class EulerMPIInters(BaseAdvectionMPIInters):
         tplargs = dict(ndims=self.ndims, nvars=self.nvars, rsolver=rsolver,
                        c=self._tpl_c)
 
-        self.kernels['comm_flux'] = lambda: self._be.kernel(
+        self.kernels['comfmdisfn'] = lambda: self._be.kernel(
             'mpicflux', tplargs, dims=[self.ninterfpts],
-            ul=self._scal0_lhs, ur=self._scal0_rhs,
+            ul=self._scal0_lhs, ur=self._scal0_rhs, fl=self._vect0_lhs,
             magnl=self._mag_pnorm_lhs, nl=self._norm_pnorm_lhs
         )
 
@@ -49,10 +50,10 @@ class EulerBaseBCInters(BaseAdvectionBCInters):
         tplargs = dict(ndims=self.ndims, nvars=self.nvars, rsolver=rsolver,
                        c=self._tpl_c, bctype=self.type)
 
-        self.kernels['comm_flux'] = lambda: self._be.kernel(
+        self.kernels['comfmdisfn'] = lambda: self._be.kernel(
             'bccflux', tplargs, dims=[self.ninterfpts], ul=self._scal0_lhs,
-            magnl=self._mag_pnorm_lhs, nl=self._norm_pnorm_lhs,
-            ploc=self._ploc
+            fl=self._vect0_lhs, magnl=self._mag_pnorm_lhs,
+            nl=self._norm_pnorm_lhs, ploc=self._ploc
         )
 
 

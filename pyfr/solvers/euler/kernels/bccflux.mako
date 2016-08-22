@@ -7,6 +7,7 @@
 
 <%pyfr:kernel name='bccflux' ndim='1'
               ul='inout view fpdtype_t[${str(nvars)}]'
+              fl='in view fpdtype_t[${str(ndims)}][${str(nvars)}]'
               nl='in fpdtype_t[${str(ndims)}]'
               magnl='in fpdtype_t'
               ploc='in fpdtype_t[${str(ndims)}]'
@@ -20,7 +21,10 @@
     ${pyfr.expand('rsolve', 'ul', 'ur', 'nl', 'fn')};
 
     // Scale and write out the common normal fluxes
+    fpdtype_t fln;
 % for i in range(nvars):
-    ul[${i}] = magnl*fn[${i}];
+    fln = ${'+'.join('nl[{0}]*fl[{0}][{1}]'.format(j, i)
+                      for j in range(ndims))};
+    ul[${i}] =  magnl*(fn[${i}] - fln);
 % endfor
 </%pyfr:kernel>

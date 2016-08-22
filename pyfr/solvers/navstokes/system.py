@@ -56,10 +56,10 @@ class NavierStokesSystem(BaseAdvectionDiffusionSystem):
 
         if ('eles', 'gradcoru_qpts') in kernels:
             q1 << kernels['eles', 'gradcoru_qpts']()
-        q1 << kernels['eles', 'tdisf']()
-        q1 << kernels['eles', 'tdivtpcorf']()
-        q1 << kernels['iint', 'comm_flux']()
-        q1 << kernels['bcint', 'comm_flux'](t=t)
+        q1 << kernels['eles', 'disf_upts']()
+        q1 << kernels['eles', 'disf_fpts']()
+        q1 << kernels['iint', 'comfmdisfn']()
+        q1 << kernels['bcint', 'comfmdisfn'](t=t)
 
         q2 << kernels['mpiint', 'vect_fpts_send']()
         q2 << kernels['mpiint', 'vect_fpts_recv']()
@@ -67,10 +67,12 @@ class NavierStokesSystem(BaseAdvectionDiffusionSystem):
 
         runall([q1, q2])
 
-        q1 << kernels['mpiint', 'comm_flux']()
-        q1 << kernels['eles', 'tdivtconf']()
-        if ('eles', 'tdivf_qpts') in kernels:
-            q1 << kernels['eles', 'tdivf_qpts']()
+        q1 << kernels['mpiint', 'comfmdisfn']()
+        q1 << kernels['eles', 'tdivdisf']()
+        q1 << kernels['eles', 'divdisf']()
+        q1 << kernels['eles', 'divconf']()
+        if ('eles', 'divf_qpts') in kernels:
+            q1 << kernels['eles', 'divf_qpts']()
             q1 << kernels['eles', 'negdivconf'](t=t)
             q1 << kernels['eles', 'divf_upts']()
         else:

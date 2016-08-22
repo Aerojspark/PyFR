@@ -12,6 +12,7 @@
               ur='inout mpi fpdtype_t[${str(nvars)}]'
               gradul='in view fpdtype_t[${str(ndims)}][${str(nvars)}]'
               gradur='in mpi fpdtype_t[${str(ndims)}][${str(nvars)}]'
+              fl='in view fpdtype_t[${str(ndims)}][${str(nvars)}]'
               amul='in view fpdtype_t'
               amur='in mpi fpdtype_t'
               nl='in fpdtype_t[${str(ndims)}]'
@@ -30,6 +31,7 @@
     ${pyfr.expand('viscous_flux_add', 'ur', 'gradur', 'amur', 'fvr')};
 % endif
 
+    fpdtype_t fln;
 % for i in range(nvars):
 % if beta == -0.5:
     fvcomm = ${' + '.join('nl[{j}]*fvr[{j}][{i}]'.format(i=i, j=j)
@@ -49,6 +51,9 @@
     fvcomm += ${tau}*(ul[${i}] - ur[${i}]);
 % endif
 
-    ul[${i}] = magnl*(ficomm[${i}] + fvcomm);
+    fln = ${'+'.join('nl[{0}]*fl[{0}][{1}]'.format(j, i)
+                      for j in range(ndims))};
+
+    ul[${i}] = magnl*(ficomm[${i}] + fvcomm - fln);
 % endfor
 </%pyfr:kernel>

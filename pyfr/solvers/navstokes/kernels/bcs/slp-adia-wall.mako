@@ -15,7 +15,7 @@
     ur[${nvars - 1}] = ul[${nvars - 1}];
 </%pyfr:macro>
 
-<%pyfr:macro name='bc_common_flux_state' params='ul, gradul, amul, nl, magnl, ploc, t'>
+<%pyfr:macro name='bc_common_flux_state' params='ul, gradul, fl, amul, nl, magnl, ploc, t'>
     // Ghost state r
     fpdtype_t ur[${nvars}];
     ${pyfr.expand('bc_ldg_state', 'ul', 'nl', 'ur', 'ploc', 't')};
@@ -24,7 +24,11 @@
     fpdtype_t ficomm[${nvars}];
     ${pyfr.expand('rsolve', 'ul', 'ur', 'nl', 'ficomm')};
 
+    fpdtype_t fln;
 % for i in range(nvars):
-    ul[${i}] = magnl*(ficomm[${i}]);
+    fln = ${'+'.join('nl[{0}]*fl[{0}][{1}]'.format(j, i)
+                      for j in range(ndims))};
+
+    ul[${i}] = magnl*(ficomm[${i}] - fln);
 % endfor
 </%pyfr:macro>
