@@ -40,3 +40,10 @@ class BaseAdvectionSystem(BaseSystem):
         else:
             q1 << kernels['eles', 'negdivconf'](t=t)
         runall([q1])
+
+    def dteles(self, cfl, uinbank):
+        q = self._queues[0]
+        self.eles_scal_upts_inb.active = uinbank
+
+        q % self._kernels['eles', 'dt_upts']()
+        q % self._kernels['eles', 'dt_eles'](cfl=cfl)

@@ -7,6 +7,7 @@ import re
 import numpy as np
 
 from pyfr.nputil import npeval, fuzzysort
+from pyfr.quadrules import get_quadrule
 from pyfr.util import lazyprop, memoize
 
 
@@ -42,6 +43,11 @@ class BaseElements(object, metaclass=ABCMeta):
 
         # If we need quadrature points or not
         haveqpts = 'flux' in self.antialias or 'div-flux' in self.antialias
+
+        # See CFL controller is used or not
+        self.cflcontrol = (
+            self.cfg.get('solver-time-integrator', 'controller') == 'cfl'
+        )
 
         # Sizes
         self.nupts = basis.nupts
@@ -186,6 +192,10 @@ class BaseElements(object, metaclass=ABCMeta):
         self._scal_upts_temp = backend.matrix(inb.ioshape, aliases=aliases,
                                               tags=inb.tags)
 
+        if self.cflcontrol:
+            # Allocate space for dt at solution points
+            self.dt_upts = backend.matrix((nupts, neles), tags={'align'})
+
     @memoize
     def opmat(self, expr):
         return self._be.const_matrix(self.basis.opmat(expr),
@@ -237,6 +247,44 @@ class BaseElements(object, metaclass=ABCMeta):
     @memoize
     def ploc_at(self, name):
         return self._be.const_matrix(self.ploc_at_np(name), tags={'align'})
+
+    @lazyprop
+    def char_len(self):
+        # Maximum quadrature rules
+        max_qrule = {'line': ('gauss-legendre', 20),
+                     'tri': ('witherden-vincent', 79),
+                     'quad': ('gauss-legendre', 196),
+                     'tet': ('witherden-vincent', 81),
+                     'pri': ('williams-shunn~gauss-legendre', 405),
+                     'pyr': ('fgauss-jacobi', 343),
+                     'hex': ('gauss-legendre', 729)}
+
+        # Find a maximum quadrature rule
+        ename = self.basis.name
+        qrule = get_quadrule(ename, *max_qrule[ename])
+        pts, wts = qrule.pts, qrule.wts
+
+        # Get domain Jacobian
+        _, djacs_mpts = self._smats_djacs_mpts
+
+        # Interpolation matrix to pts
+        m0 = self.basis.mbasis.nodal_basis_at(pts)
+
+        # Interpolate the djacs
+        djac = np.dot(m0, djacs_mpts)
+
+        # Get volume
+        vol = np.dot(wts, djac)
+
+        # Get face area
+        facefpts, fpts_wts = self.basis.facefpts, self.basis.fpts_wts
+        farea = np.array([np.dot(fpts_wts[i], self._mag_pnorm_fpts[i])
+                          for i in facefpts])
+
+        # Get characteristic length
+        le = np.max(vol/farea, axis=0).reshape(1, -1)
+
+        return self._be.const_matrix(le, tags={'align'})
 
     def _gen_pnorm_fpts(self):
         smats = self.smat_at_np('fpts').transpose(1, 3, 0, 2)

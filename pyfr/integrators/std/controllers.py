@@ -71,6 +71,57 @@ class StdNoneController(BaseStdController):
             self._accept_step(dt, idxcurr)
 
 
+class StdCFLController(BaseStdController):
+    controller_name = 'cfl'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self._cfl = self.cfg.getfloat('solver-time-integrator', 'cfl')
+
+    @property
+    def _controller_needs_errest(self):
+        return False
+
+    @memoize
+    def _get_dtmin_kerns(self):
+        kerns = proxylist([])
+        for dt in self.system.ele_dt_upts:
+            kerns.append(self.backend.kernel('vmin', dt))
+
+        return kerns
+
+    def _dtstep(self):
+        comm, rank, root = get_comm_rank_root()
+
+        dtmin = self._get_dtmin_kerns()
+        dtele = self.system.dteles
+
+        dtele(self._cfl, self._idxcurr)
+        self._queue % dtmin()
+
+        dtl = min(dtmin.retval)
+        dtg = comm.allreduce(dtl, op=get_mpi('min'))
+
+        return dtg
+
+    def advance_to(self, t):
+        if t < self.tcurr:
+            raise ValueError('Advance time is in the past')
+
+        while self.tcurr < t:
+            idxcurr = 0
+            # Decide on the time step
+            self._dt = self._dtstep()
+            dt = max(min(t - self.tcurr, self._dt), self.dtmin)
+
+            # Take the step
+            idxcurr = self.step(self.tcurr, dt)
+
+            # We are not adaptive, so accept every step
+            self._accept_step(dt, idxcurr)
+
+
 class StdPIController(BaseStdController):
     controller_name = 'pi'
 

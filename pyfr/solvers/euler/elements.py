@@ -73,3 +73,12 @@ class EulerElements(BaseFluidElements, BaseAdvectionElements):
                 u=self.scal_upts_inb, smats=self.smat_at('upts'),
                 f=self._vect_upts
             )
+
+        # CFL Time step controller
+        if self.cflcontrol:
+            backend.pointwise.register('pyfr.solvers.euler.kernels.dtupts')
+
+            self.kernels['dt_upts'] = lambda: backend.kernel(
+                'dtupts', tplargs, dims=[self.nupts, self.neles],
+                u=self.scal_upts_inb, wv=self.dt_upts
+            )

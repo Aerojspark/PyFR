@@ -2,6 +2,7 @@
 
 import numpy as np
 import pyopencl as cl
+from pyopencl import array
 from pyopencl.array import Array
 from pyopencl.reduction import ReductionKernel
 
@@ -80,3 +81,21 @@ class OpenCLBlasExtKernels(OpenCLKernelProvider):
                                      queue=qcomp)
 
         return ErrestKernel()
+
+    def vmin(self, x):
+        cnt = x.ncol
+        dtype = x.dtype
+
+        class MinKernel(ComputeKernel):
+            @property
+            def retval(self):
+                return self._retarr.get()
+
+            def run(self, queue):
+                qcomp = queue.cl_queue_comp
+
+                xarr = Array(qcomp, cnt, dtype, data=x.data)
+
+                self._retarr = array.min(xarr, queue=qcomp)
+
+        return MinKernel()

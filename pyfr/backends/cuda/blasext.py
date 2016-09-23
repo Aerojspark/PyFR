@@ -2,6 +2,7 @@
 
 import numpy as np
 import pycuda.driver as cuda
+from pycuda import gpuarray
 from pycuda.gpuarray import GPUArray
 from pycuda.reduction import ReductionKernel
 
@@ -82,3 +83,17 @@ class CUDABlasExtKernels(CUDAKernelProvider):
                                      stream=queue.cuda_stream_comp)
 
         return ErrestKernel()
+
+    def vmin(self, x):
+        # Wrap
+        xarr = GPUArray(x.ncol, x.dtype, gpudata=x)
+
+        class MinKernel(ComputeKernel):
+            @property
+            def retval(self):
+                return self._retarr.get()
+
+            def run(self, queue):
+                self._retarr = gpuarray.min(xarr, stream=queue.cuda_stream_comp)
+
+        return MinKernel()

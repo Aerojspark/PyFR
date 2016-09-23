@@ -33,3 +33,13 @@ class NavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
                 u=self.scal_upts_inb, smats=self.smat_at('upts'),
                 f=self._vect_upts, artvisc=self.artvisc
             )
+
+        # CFL Time step controller
+        if self.cflcontrol:
+            backend.pointwise.register('pyfr.solvers.navstokes.kernels.dtupts')
+
+            self.kernels['dt_upts'] = lambda: backend.kernel(
+                'dtupts', tplargs, dims=[self.nupts, self.neles],
+                u=self.scal_upts_inb, wv=self.dt_upts, le=self.char_len,
+                artvisc=self.artvisc
+            )

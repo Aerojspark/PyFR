@@ -50,6 +50,10 @@ class BaseSystem(object, metaclass=ABCMeta):
         self.eles_scal_upts_inb = eles.scal_upts_inb
         self.eles_scal_upts_outb = eles.scal_upts_outb
 
+        # Get dt
+        if hasattr(eles, 'dt_upts'):
+            self.ele_dt_upts = eles.dt_upts
+
         # Save the number of dimensions and field variables
         self.ndims = eles[0].ndims
         self.nvars = eles[0].nvars

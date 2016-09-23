@@ -75,3 +75,25 @@ class OpenMPBlasExtKernels(OpenMPKernelProvider):
                 self._retval = rkern(cnt, x, y, z, atol, rtol)
 
         return ErrestKernel()
+
+    def vmin(self, x):
+        cnt = x.ncol
+        dtype = x.dtype
+
+        # Render the reduction kernel template
+        src = self.backend.lookup.get_template('vmin').render()
+
+        # Build
+        rkern = self._build_kernel(
+            'vmin', src, [np.int32] + [np.intp], restype=dtype
+        )
+
+        class MinKernel(ComputeKernel):
+            @property
+            def retval(self):
+                return self._retval
+
+            def run(self, queue):
+                self._retval = rkern(cnt, x)
+
+        return MinKernel()

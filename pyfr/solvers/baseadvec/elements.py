@@ -130,3 +130,13 @@ class BaseAdvectionElements(BaseElements):
                 return ComputeMetaKernel([mul, copy])
 
             self.kernels['filter_soln'] = filter_soln
+
+        # CFL Time step controller
+        if self.cflcontrol:
+            backend.pointwise.register('pyfr.solvers.baseadvec.kernels.dteles')
+
+            tplargs={'nupts': self.nupts}
+            self.kernels['dt_eles'] = lambda: backend.kernel(
+                'dteles', tplargs, dims=[self.neles], dt=self.dt_upts,
+                le=self.char_len
+            )
