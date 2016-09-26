@@ -14,5 +14,5 @@ vmin(long *n, double *out,
     for (int i = 0; i < *n; i++)
         val = max(val, x[i]);
 
-    *out = err;
+    *out = val;
 }

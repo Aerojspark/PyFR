@@ -80,6 +80,10 @@ class MICBlasExtKernels(MICKernelProvider):
         cnt = x.ncol
         dtype = x.dtype
 
+        # Allocate space for the return value
+        reth = np.zeros(1)
+        retd = self.backend.sdflt.bind(reth, update_device=False)
+
         # Render the reduction kernel template
         src = self.backend.lookup.get_template('vmin').render()
 
@@ -91,9 +95,10 @@ class MICBlasExtKernels(MICKernelProvider):
         class MinKernel(ComputeKernel):
             @property
             def retval(self):
-                return self._retval
+                return float(reth[0])
 
             def run(self, queue):
-                self._retval = rkern(cnt, x)
+                queue.mic_stream_comp.invoke(rkern, cnt, retd, x.data)
+                retd.update_host()
 
         return MinKernel()

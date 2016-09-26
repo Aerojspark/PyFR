@@ -94,25 +94,30 @@ class StdCFLController(BaseStdController):
     def _dtstep(self):
         comm, rank, root = get_comm_rank_root()
 
+        # Get two kernel blocks
         dtmin = self._get_dtmin_kerns()
         dtele = self.system.dteles
 
+        # Compute dt
         dtele(self._cfl, self._idxcurr)
         self._queue % dtmin()
 
+        # Minimize across elements and ranks
         dtl = min(dtmin.retval)
         dtg = comm.allreduce(dtl, op=get_mpi('min'))
 
-        return dtg
+        # Check if the characteristic wave speed is NaN
+        return dtg if not math.isinf(dtg) else self.dtmin
 
     def advance_to(self, t):
         if t < self.tcurr:
             raise ValueError('Advance time is in the past')
 
         while self.tcurr < t:
-            idxcurr = 0
-            # Decide on the time step
+            # Compute the size of the current step
             self._dt = self._dtstep()
+
+            # Decide on the time step
             dt = max(min(t - self.tcurr, self._dt), self.dtmin)
 
             # Take the step

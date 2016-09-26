@@ -2,8 +2,7 @@
 
 import numpy as np
 import pyopencl as cl
-from pyopencl import array
-from pyopencl.array import Array
+from pyopencl.array import Array, min
 from pyopencl.reduction import ReductionKernel
 
 from pyfr.backends.opencl.provider import OpenCLKernelProvider
@@ -96,6 +95,6 @@ class OpenCLBlasExtKernels(OpenCLKernelProvider):
 
                 xarr = Array(qcomp, cnt, dtype, data=x.data)
 
-                self._retarr = array.min(xarr, queue=qcomp)
+                self._retarr = min(xarr, queue=qcomp)
 
         return MinKernel()
