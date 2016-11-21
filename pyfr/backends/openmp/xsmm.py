@@ -12,7 +12,7 @@ from pyfr.ctypesutil import load_library
 
 class XSMMWrappers(object):
     def __init__(self, cblas):
-        # TODO: libxsmm requires dgemm rourine
+        # TODO: libxsmm requires GEMM
         cblas = CDLL(cblas, mode=RTLD_GLOBAL)
 
         # Load XSMM library
@@ -87,8 +87,7 @@ class OpenMPXSMMKernels(OpenMPKernelProvider):
         argt = [np.intp, np.int32, np.intp, np.intp, np.intp]
 
         # Render the kernel template
-        tplargs = dict(nblock=nblock)
-        src = self.backend.lookup.get_template('par_xsmm_gemm').render(**tplargs)
+        src = self.backend.lookup.get_template('par_xsmm_gemm').render()
 
         # Build
         par_gemm = self._build_kernel('par_xsmm_gemm', src, argt)
