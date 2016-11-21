@@ -13,7 +13,7 @@ class BaseStdStepper(BaseStdIntegrator):
     def collect_stats(self, stats):
         super().collect_stats(stats)
 
-        stats.set('solver-time-integrator', 'nsteps', self.nsteps)
+        # Total number of RHS evaluations
         stats.set('solver-time-integrator', 'nfevals', self._stepper_nfevals)
 
 
@@ -83,7 +83,8 @@ class StdTVDRK3Stepper(BaseStdStepper):
         rhs(t + dt, r1, r2)
         add(0.25, r1, 0.75, r0, 0.25*dt, r2)
 
-        # Third stage; r2 = -∇·f(r1); r1 = 1.0/3.0*r0 + 2.0/3.0*r1 + 2.0/3.0*dt*r2
+        # Third stage; r2 = -∇·f(r1);
+        #              r1 = 1.0/3.0*r0 + 2.0/3.0*r1 + 2.0/3.0*dt*r2
         rhs(t + 0.5*dt, r1, r2)
         add(2.0/3.0, r1, 1.0/3.0, r0, 2.0/3.0*dt, r2)
 
@@ -91,7 +92,7 @@ class StdTVDRK3Stepper(BaseStdStepper):
         return r1
 
 
-class StdRK4StdStepper(BaseStdStepper):
+class StdRK4Stepper(BaseStdStepper):
     stepper_name = 'rk4'
 
     @property
